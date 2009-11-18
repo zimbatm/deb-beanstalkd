@@ -1,0 +1,44 @@
+#!/bin/sh
+# vim: ts=4:et:sts=4
+# $Id: beanstalkd.postrm 89 2009-01-03 16:34:01Z robert $
+
+set -e
+
+#DEBHELPER#
+
+PACKAGE=beanstalkd
+DEFAULTSFILE=/etc/default/$PACKAGE
+
+
+case "$1" in
+   failed-install|abort-install|abort-upgrade|failed-upgrade)
+        exit 0
+    ;;
+
+    remove)
+        if [ -d /var/lib/beanstalkd ]; then
+            if [ $(find /var/lib/beanstalkd -type f | wc -l) -eq 0 ]; then
+                rmdir /var/lib/beanstalkd
+            else
+                echo "/var/lib/beanstalkd is not empty; not deleting"
+            fi
+        fi
+        exit 0
+    ;;
+    purge)
+
+        rm -rf /var/lib/beanstalkd/
+
+        # remove user, group and home directory beanstalkd
+        deluser --remove-home beanstalkd >/dev/null 2>&1 || true
+
+        exit 0
+    ;;
+    upgrade|disappear)
+        exit 0
+    ;;
+    *)
+        echo "postrm called with unknown argument \`$1'" >&2
+        exit 0
+    ;;
+esac

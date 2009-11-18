@@ -1,0 +1,8 @@
+Document: beanstalk-protocol
+Title: Beanstalkd protocol
+Author:  Keith Rarick
+Abstract: Specification of the protocol clients can use to talk to beanstalkd
+Section: Network/Communication
+
+Format: Text
+Files: /usr/share/doc/beanstalkd/protocol.txt.gz

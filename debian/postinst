@@ -1,0 +1,32 @@
+#!/bin/sh
+
+set -e
+
+
+PACKAGE=beanstalkd
+DEFAULTSFILE=/etc/default/$PACKAGE
+
+case "$1" in
+    configure)
+
+        # Create beanstalkd system user
+        getent passwd beanstalkd > /dev/null || \
+            adduser --quiet --system --home /var/lib/beanstalkd  --no-create-home \
+            --gecos 'Beanstalk Server' --group beanstalkd
+
+        ;;
+
+    failed-upgrade|abort-upgrade|abort-remove|abort-deconfigure|in-favour|removing)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2;
+        exit 1;
+        ;;
+esac
+
+chown beanstalkd:beanstalkd /var/lib/beanstalkd/
+
+#DEBHELPER#
+
+exit 0

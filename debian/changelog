@@ -1,0 +1,5 @@
+beanstalkd (1.4.3-1) unstable; urgency=low
+
+  * Initial release (Closes: #557128)
+
+ -- Serafeim Zanikolas <serzan@hellug.gr>  Wed, 18 Nov 2009 23:32:00 +0100

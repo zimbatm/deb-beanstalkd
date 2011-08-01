@@ -1,3 +1,9 @@
+beanstalkd (1.4.6) lucid; urgency=low
+
+  * New updatream version
+
+ -- Jonas Pfenniger <jonas@pfenniger.name>  Mon, 01 Aug 2011 12:49:31 -0700
+
 beanstalkd (1.4.3-1) unstable; urgency=low
 
   * Initial release (Closes: #557128)

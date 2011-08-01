@@ -12,9 +12,10 @@ nonnegative.
 
 Names, in this protocol, are ASCII strings. They may contain letters (A-Z and
 a-z), numerals (0-9), hyphen ("-"), plus ("+"), slash ("/"), semicolon (";"),
-dot ("."), dollar-sign ("$"), and parentheses ("(" and ")"), but they may not
-begin with a hyphen. They are terminated by white space (either a space char or
-end of line). Each name must be at least one character long.
+dot ("."), dollar-sign ("$"), underscore ("_"), and parentheses ("(" and ")"),
+but they may not begin with a hyphen. They are terminated by white space
+(either a space char or end of line). Each name must be at least one character
+long.
 
 The protocol contains two kinds of data: text lines and unstructured chunks of
 data. Text lines are used for client commands and server responses. Chunks are
@@ -39,10 +40,6 @@ the server will reply with one of the following error messages:
  - "INTERNAL_ERROR\r\n" This indicates a bug in the server. It should never
    happen. If it does happen, please report it at
    http://groups.google.com/group/beanstalk-talk.
-
- - "DRAINING\r\n" This means that the server has been put into "drain mode"
-   and is no longer accepting new jobs. The client should try another server
-   or disconnect and try again later.
 
  - "BAD_FORMAT\r\n" The client sent a command line that was not well-formed.
    This can happen if the line does not end with \r\n, if non-numeric
@@ -134,7 +131,7 @@ below).
 
  - <pri> is an integer < 2**32. Jobs with smaller priority values will be
    scheduled before jobs with larger priorities. The most urgent priority is 0;
-   the least urgent priority is 4294967295.
+   the least urgent priority is 4,294,967,295.
 
  - <delay> is an integer number of seconds to wait before putting the job in
    the ready queue. The job will be in the "delayed" state during this time.
@@ -170,6 +167,10 @@ may be:
 
  - "JOB_TOO_BIG\r\n" The client has requested to put a job with a body larger
    than max-job-size bytes.
+
+ - "DRAINING\r\n" This means that the server has been put into "drain mode"
+   and is no longer accepting new jobs. The client should try another server
+   or disconnect and try again later.
 
 The "use" command is for producers. Subsequent put commands will put jobs into
 the tube specified by this command. If no use command has been issued, jobs
@@ -360,8 +361,6 @@ variations. All but the first operate only on the currently used tube.
  - "peek-delayed\r\n" - return the delayed job with the shortest delay left.
 
  - "peek-buried\r\n" - return the next job in the list of buried jobs.
-
- - "quit\r\n" - close the connection.
 
 There are two possible responses, either a single line:
 

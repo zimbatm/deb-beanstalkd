@@ -1,12 +1,12 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+. "$SRCDIR/sh-tests/common.functions"
 
 server=localhost
-port=11400
 tmpdir="$TMPDIR"
 test -z "$tmpdir" && tmpdir=/tmp
 tmpf="${tmpdir}/bnch$$"
-nc='nc -q 10'
-nc -q 10 2>&1 | grep -q "illegal option" && nc='nc -w 10' # workaround for older netcat
+nc="$SRCDIR/sh-tests/netcat.py"
 
 commands="$1"; shift
 expected="$1"; shift
@@ -34,14 +34,7 @@ if [ ! -x ./beanstalkd ]; then
   exit 2
 fi
 
-./beanstalkd -p $port >/dev/null 2>/dev/null &
-bpid=$!
-
-sleep .1
-if ! ps -p $bpid >/dev/null; then
-  echo "Could not start beanstalkd for testing, port $port is taken"
-  exit 2
-fi
+start_beanstalkd '' '-z 10'
 
 # Run the test
 fgrep -v "#" $commands | $nc $server $port > "$tmpf"

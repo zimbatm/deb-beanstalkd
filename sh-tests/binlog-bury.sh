@@ -1,22 +1,14 @@
 #!/usr/bin/env bash
 
+. "$SRCDIR/sh-tests/common.functions"
+
 server=localhost
-port=11400
 tmpdir="$TMPDIR"
 test -z "$tmpdir" && tmpdir=/tmp
 out1="${tmpdir}/bnch$$.1"
 out2="${tmpdir}/bnch$$.2"
 logdir="${tmpdir}/bnch$$.d"
-nc='nc -q 1'
-nc -q 1 2>&1 | grep -q "illegal option" && nc='nc -w 1' # workaround for older netcat
-
-killbeanstalkd() {
-    {
-        test -z "$bpid" || kill -9 $bpid
-        /bin/true # Somehow this gets rid of an unnessary shell message.
-    } >/dev/null 2>&1
-    bpid=
-}
+nc="$SRCDIR/sh-tests/netcat.py"
 
 cleanup() {
     killbeanstalkd
@@ -36,16 +28,7 @@ if [ ! -x ./beanstalkd ]; then
   exit 2
 fi
 
-mkdir -p $logdir
-
-./beanstalkd -p $port -b "$logdir" >/dev/null 2>/dev/null &
-bpid=$!
-
-sleep .1
-if ! ps -p $bpid >/dev/null; then
-  echo "Could not start beanstalkd for testing (possibly port $port is taken)"
-  exit 2
-fi
+start_beanstalkd $logdir
 
 $nc $server $port <<EOF > "$out1"
 put 0 0 100 0

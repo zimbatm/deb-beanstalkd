@@ -1,31 +1,21 @@
 #!/usr/bin/env bash
 
+. "$SRCDIR/sh-tests/common.functions"
+
 server=localhost
-port=11400
 tmpdir="$TMPDIR"
 size=1024
-truncated_size_1=796
-truncated_size_2=928
 test -z "$tmpdir" && tmpdir=/tmp
 out1="${tmpdir}/bnch$$.1"
 out2="${tmpdir}/bnch$$.2"
 logdir="${tmpdir}/bnch$$.d"
-nc='nc -q 1'
-nc -q 1 2>&1 | grep -q "illegal option" && nc='nc -w 1' # workaround for older netcat
+nc="$SRCDIR/sh-tests/netcat.py"
 
 fail() {
     printf 'On line '
     caller
     echo ' ' "$@"
     exit 1
-}
-
-killbeanstalkd() {
-    {
-        test -z "$bpid" || kill -9 $bpid
-        /bin/true # Somehow this gets rid of an unnessary shell message.
-    } >/dev/null 2>&1
-    bpid=
 }
 
 cleanup() {
@@ -51,16 +41,7 @@ if [ ! -x ./beanstalkd ]; then
   exit 2
 fi
 
-mkdir -p $logdir
-
-./beanstalkd -p $port -b "$logdir" -s $size >/dev/null 2>/dev/null &
-bpid=$!
-
-sleep .1
-if ! ps -p $bpid >/dev/null; then
-  echo "Could not start beanstalkd for testing (possibly port $port is taken)"
-  exit 2
-fi
+start_beanstalkd $logdir "-s $size"
 
 # Check that the first binlog file is the proper size.
 test "$(fsize "$logdir"/binlog.1)" -eq $size || fail first binlog wrong size
@@ -136,16 +117,14 @@ res=$?
 test "$res" -eq 0 || exit $res
 
 # Check that the first binlog file is still the proper size.
-if ! test "$(fsize "$logdir"/binlog.1)" -eq $truncated_size_1
+if ! test "$(fsize "$logdir"/binlog.1)" -le $size
 then
-  fail first binlog changed
+  fail first binlog grew too big
 fi
 
 # Check that the second binlog file is the proper size.
-if ! test "$(fsize "$logdir"/binlog.2)" -eq $truncated_size_2
+if ! test "$(fsize "$logdir"/binlog.2)" -le $size
 then
-  fail second binlog changed
+  fail second binlog grew too big
 fi
-
-killbeanstalkd
 

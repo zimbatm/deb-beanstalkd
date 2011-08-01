@@ -46,7 +46,7 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
 #define NAME_CHARS \
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ" \
     "abcdefghijklmnopqrstuvwxyz" \
-    "0123456789-+/;.$()"
+    "0123456789-+/;.$_()"
 
 #define CMD_PUT "put "
 #define CMD_PEEKJOB "peek "
@@ -218,6 +218,22 @@ size_t job_data_size_limit = JOB_DATA_SIZE_LIMIT_DEFAULT;
     "cmd-pause-tube: %u\n" \
     "pause: %" PRIu64 "\n" \
     "pause-time-left: %" PRIu64 "\n" \
+    "\r\n"
+
+#define STATS_JOB_FMT "---\n" \
+    "id: %" PRIu64 "\n" \
+    "tube: %s\n" \
+    "state: %s\n" \
+    "pri: %u\n" \
+    "age: %" PRIu64 "\n" \
+    "delay: %" PRIu64 "\n" \
+    "ttr: %" PRIu64 "\n" \
+    "time-left: %" PRIu64 "\n" \
+    "reserves: %u\n" \
+    "timeouts: %u\n" \
+    "releases: %u\n" \
+    "buries: %u\n" \
+    "kicks: %u\n" \
     "\r\n"
 
 /* this number is pretty arbitrary */
@@ -781,6 +797,26 @@ fill_extra_data(conn c)
 }
 
 static void
+_skip(conn c, int n, const char *line, int len)
+{
+    /* Invert the meaning of in_job_read while throwing away data -- it
+     * counts the bytes that remain to be thrown away. */
+    c->in_job = 0;
+    c->in_job_read = n;
+    fill_extra_data(c);
+
+    if (c->in_job_read == 0) return reply(c, line, len, STATE_SENDWORD);
+
+    c->reply = line;
+    c->reply_len = len;
+    c->reply_sent = 0;
+    c->state = STATE_BITBUCKET;
+    return;
+}
+
+#define skip(c,n,m) (_skip(c,n,m,CONSTSTRLEN(m)))
+
+static void
 enqueue_incoming_job(conn c)
 {
     int r;
@@ -1001,6 +1037,9 @@ do_list_tubes(conn c, ms l)
     c->out_job = allocate_job(resp_z); /* fake job to hold response data */
     if (!c->out_job) return reply_serr(c, MSG_OUT_OF_MEMORY);
 
+    /* Mark this job as a copy so it can be appropriately freed later on */
+    c->out_job->state = JOB_STATE_COPY;
+
     /* now actually format the response */
     buf = c->out_job->body;
     buf += snprintf(buf, 5, "---\n");
@@ -1027,22 +1066,7 @@ fmt_job_stats(char *buf, size_t size, job j)
     } else {
         time_left = 0;
     }
-    return snprintf(buf, size,
-            "id: %" PRIu64 "\n"
-            "tube: %s\n"
-            "state: %s\n"
-            "pri: %u\n"
-            "age: %" PRIu64 "\n"
-            "delay: %" PRIu64 "\n"
-            "ttr: %" PRIu64 "\n"
-            "time-left: %" PRIu64 "\n"
-            "reserves: %u\n"
-            "timeouts: %u\n"
-            "releases: %u\n"
-            "buries: %u\n"
-            "kicks: %u\n"
-            "\r\n",
-
+    return snprintf(buf, size, STATS_JOB_FMT,
             j->id,
             j->tube->name,
             job_state(j),
@@ -1172,7 +1196,8 @@ dispatch_cmd(conn c)
         if (errno) return reply_msg(c, MSG_BAD_FORMAT);
 
         if (body_size > job_data_size_limit) {
-            return reply_msg(c, MSG_JOB_TOO_BIG);
+            /* throw away the job body and respond with JOB_TOO_BIG */
+            return skip(c, body_size + 2, MSG_JOB_TOO_BIG);
         }
 
         /* don't allow trailing garbage */
@@ -1185,16 +1210,8 @@ dispatch_cmd(conn c)
         /* OOM? */
         if (!c->in_job) {
             /* throw away the job body and respond with OUT_OF_MEMORY */
-
-            /* Invert the meaning of in_job_read while throwing away data -- it
-             * counts the bytes that remain to be thrown away. */
-            c->in_job_read = body_size + 2;
-            fill_extra_data(c);
-
-            if (c->in_job_read == 0) return reply_serr(c, MSG_OUT_OF_MEMORY);
-
-            c->state = STATE_BITBUCKET;
-            return;
+            twarnx("server error: " MSG_OUT_OF_MEMORY);
+            return skip(c, body_size + 2, MSG_OUT_OF_MEMORY);
         }
 
         fill_extra_data(c);
@@ -1641,7 +1658,9 @@ h_conn_data(conn c)
 
         /* (c->in_job_read < 0) can't happen */
 
-        if (c->in_job_read == 0) return reply_serr(c, MSG_OUT_OF_MEMORY);
+        if (c->in_job_read == 0) {
+            return reply(c, c->reply, c->reply_len, STATE_SENDWORD);
+        }
         break;
     case STATE_WANTDATA:
         j = c->in_job;
@@ -1771,12 +1790,12 @@ h_accept(const int fd, const short which, struct event *ev)
     conn c;
     int cfd, flags, r;
     socklen_t addrlen;
-    struct sockaddr addr;
+    struct sockaddr_in6 addr;
 
     if (which == EV_TIMEOUT) return h_delay();
 
     addrlen = sizeof addr;
-    cfd = accept(fd, &addr, &addrlen);
+    cfd = accept(fd, (struct sockaddr *)&addr, &addrlen);
     if (cfd == -1) {
         if (errno != EAGAIN && errno != EWOULDBLOCK) twarn("accept()");
         if (errno == EMFILE) brake();

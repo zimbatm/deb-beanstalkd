@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
+. "$SRCDIR/sh-tests/common.functions"
+
 ENOSPC=28
 server=localhost
-port=11400
 tmpdir="$TMPDIR"
 size=1000
 test -z "$tmpdir" && tmpdir=/tmp
 out1="${tmpdir}/bnch$$.1"
 out2="${tmpdir}/bnch$$.2"
 logdir="${tmpdir}/bnch$$.d"
-nc='nc -q 1'
-nc -q 1 2>&1 | grep -q "illegal option" && nc='nc -w 1' # workaround for older netcat
+nc="$SRCDIR/sh-tests/netcat.py"
 
 if test "`type -t fiu-run`" = ''
 then
@@ -25,17 +25,9 @@ fail() {
     exit 1
 }
 
-killbeanstalkd() {
-    {
-        test -z "$bpid" || kill -9 $bpid
-        /bin/true # Somehow this gets rid of an unnessary shell message.
-    } >/dev/null 2>&1
-    bpid=
-}
-
 cleanup() {
     killbeanstalkd
-    rm -rf "$logdir" "$out1" "$out2"
+    rm -rf "$logdir" "$out1" "$out2" ${tmpdir}/fiu-ctrl-[0-9]*.{in,out}
 }
 
 catch() {
@@ -56,16 +48,7 @@ if [ ! -x ./beanstalkd ]; then
   exit 2
 fi
 
-mkdir -p $logdir
-
-fiu-run -x ./beanstalkd -p $port -b "$logdir" -s $size >/dev/null 2>/dev/null &
-bpid=$!
-
-sleep .1
-if ! ps -p $bpid >/dev/null; then
-  echo "Could not start beanstalkd for testing (possibly port $port is taken)"
-  exit 2
-fi
+start_beanstalkd $logdir "-s $size" "fiu-run -x"
 
 # Insert enough jobs to create another binlog file
 $nc $server $port <<EOF > "$out1"
@@ -181,15 +164,7 @@ test "$res" -eq 0 || exit $res
 
 killbeanstalkd
 
-sleep .1
-./beanstalkd -p $port -b "$logdir" -s $size >/dev/null 2>/dev/null &
-bpid=$!
-
-sleep .1
-if ! ps -p $bpid >/dev/null; then
-  echo "Could not start beanstalkd for testing (possibly port $port is taken)"
-  exit 2
-fi
+start_beanstalkd $logdir "-s $size"
 
 $nc $server $port <<EOF > "$out2"
 delete 8

@@ -48,14 +48,14 @@ EXTRA_DIST = cut.c $(tests) $(scripts) $(readme) cut.h sh-tests check.sh check-o
 	tube.h \
 	util.h
 
-dist_doc_DATA = doc/protocol.txt
+dist_doc_DATA = doc/protocol.txt NEWS.md
 dist_man_MANS = doc/beanstalkd.1
 
 check-cut: tests/cutcheck
 	tests/cutcheck
 
 check-shell: $(program)
-	$(srcdir)/check.sh $(srcdir)/sh-tests/*.{commands,sh}
+	SRCDIR=$(srcdir) $(srcdir)/check.sh $(srcdir)/sh-tests/*.{commands,sh}
 
 check: check-cut check-shell
 
